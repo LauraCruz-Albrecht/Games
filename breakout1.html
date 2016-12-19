@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Gamedev Canvas Workshop</title>
+    <style>
+        * { padding: 0; margin: 0; }
+        canvas { background: #eee; display: block; margin: 0 auto;
+    </style>
+</head>
+<body>
+    
+<canvas id="myCanvas" width="480" height="500"></canvas>
+        
+<script>
+    // JavaScript code goes here
+    /*reference: https://developer.mozilla.org/en-US/docs/Games/Tutorials/2D_Breakout_game_pure_JavaScript/Finishing_up
+     */
+    
+    // reference to the <canvas> element
+    var canvas = document.getElementById("myCanvas");
+    
+    // variable to store the 2D rendering context, used to paint on canvas
+    var ctx = canvas.getContext("2d");
+    
+    var initialYVelocity = 3;
+    
+    var x = canvas.width/2;
+    var y = canvas.height/2;
+    var dx = getInitialXVelocity();
+    var dy = initialYVelocity;
+    
+    var ballRadius = 10;
+    var ballColor = "midnightblue";
+    var paddleColor = "deepskyblue";
+    
+    var paddleHeight = 10;
+    var paddleWidth = 75;
+    var paddleX = (canvas.width-paddleWidth)/2;
+    var paddleY = canvas.height - paddleHeight - 20;
+    
+    var rightPressed = false;
+    var leftPressed = false;
+    
+    var brickRowCount = 5;
+    var brickColumnCount = 8;
+    var brickWidth = 50;
+    var brickHeight = 10;
+    var brickPadding = 6;
+    var brickOffsetTop = 30;
+    var brickOffsetLeft = (canvas.width - brickColumnCount * brickWidth -
+                           (brickColumnCount - 1) * brickPadding) / 2;
+    
+    var score = 0;
+    var lives = 3;
+    
+    // hold all bricks in 2-D array
+    var bricks = [];
+    for(c=0; c<brickColumnCount; c++) {
+        bricks[c] = [];
+        for(r=0; r<brickRowCount; r++) {
+            bricks[c][r] = { x: 0, y: 0, status: true };
+        }
+    }
+
+    function getRandomDouble(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+
+    function getInitialXVelocity() {
+        rand = getRandomDouble(1, 3);
+        var makeNegative = Math.random() < 0.5;
+        return makeNegative ? -rand : rand;
+    }
+
+    function sleep(miliseconds) {
+        var currentTime = new Date().getTime();
+        while (currentTime + miliseconds >= new Date().getTime()) { }
+    }
+
+    function drawBall() {
+        ctx.beginPath();
+        ctx.arc(x, y, ballRadius, 0, Math.PI*2);
+        ctx.fillStyle = ballColor;
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    function drawPaddle() {
+        ctx.beginPath();
+        ctx.rect(paddleX, paddleY, paddleWidth, paddleHeight);
+        ctx.fillStyle = paddleColor;
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    function getBrickColor(r) {
+        switch (r % 5) {
+            case 0: return "firebrick";
+            case 1: return "red";
+            case 2: return "orangered";
+            case 3: return "orange";
+            case 4: return "gold";
+        }
+    }
+
+    function drawSingleBrick(r, c) {
+        var brickX = (c*(brickWidth+brickPadding))+brickOffsetLeft;
+        var brickY = (r*(brickHeight+brickPadding))+brickOffsetTop;
+        bricks[c][r].x = brickX;
+        bricks[c][r].y = brickY;
+        ctx.beginPath();
+        ctx.rect(brickX, brickY, brickWidth, brickHeight);
+        ctx.fillStyle = getBrickColor(r);
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    function drawBricks() {
+        for (c = 0; c < brickColumnCount; c++) {
+            for(r = 0; r < brickRowCount; r++) {
+                if (bricks[c][r].status == 1) {
+                    drawSingleBrick(r, c);
+                }
+            }
+        }
+    }
+
+    function bounceBall() {
+        // bounce off left and right
+        if (x - ballRadius <= 0 || x + ballRadius >= canvas.width) {
+            dx = -dx;
+        }
+        
+        // bounce off top
+        if (y - ballRadius <= 0) {
+           dy = -dy
+            
+        // bounce off paddle
+        } else if (x > paddleX && x < paddleX + paddleWidth
+                   && y + ballRadius > paddleY
+                   && y + ballRadius < paddleY + paddleHeight) {
+            dy = -Math.abs(dy)
+        }
+    }
+
+    function movePaddle() {
+        if (rightPressed && paddleX < canvas.width - paddleWidth) {
+            paddleX += 7;
+        } else if (leftPressed && paddleX > 0) {
+            paddleX -= 7;
+        }
+    }
+
+    function cornerInBrick(cornerX, cornerY, b) {
+        return (cornerX > b.x && cornerX < b.x + brickWidth &&
+                cornerY > b.y && cornerY < b.y + brickHeight);
+    }
+
+    function isCollisionWithBrick(b) {
+        // check whether any of the four corners are fully contained in brick
+        var x1 = x - ballRadius;
+        var x2 = x + ballRadius;
+        var y1 = y - ballRadius;
+        var y2 = y + ballRadius;
+        return (cornerInBrick(x1, y1, b) || cornerInBrick(x1, y2, b) ||
+                cornerInBrick(x2, y1, b) || cornerInBrick(x2, y2, b));
+    }
+
+    function collisionDetection() {
+        for (c = 0; c < brickColumnCount; c++) {
+            for (r = 0; r < brickRowCount; r++) {
+                var b = bricks[c][r];
+                if (b.status == 1) {
+                    if (isCollisionWithBrick(b)) {
+                        dy = -dy;
+                        b.status = 0
+                        score++;
+                    }
+                }
+            }
+        }
+    }
+
+    function drawScore() {
+        ctx.font = "16px Arial";
+        ctx.fillStyle = "#0095DD";
+        ctx.fillText("Score: " + score, 8, 20); // text, coords
+    }
+
+    function drawLives() {
+        ctx.font = "16px Arial";
+        ctx.fillStyle = "#0095DD";
+        ctx.fillText("Lives: "+lives, canvas.width-65, 20);
+    }
+
+    function detectWin() {
+        var nBricks = brickRowCount * brickColumnCount;
+        if (score == nBricks) {
+            // alert("You win!");
+            x = canvas.width/2;
+            y = canvas.height/2;
+            document.location.reload();
+        }
+    }
+
+    function resetVars() {
+        x = canvas.width/2;
+        y = canvas.height/2;
+        dx = getInitialXVelocity();;
+        dy = initialYVelocity;
+        paddleX = (canvas.width-paddleWidth)/2;
+    }
+
+    function detectLose() {
+        if (y - ballRadius > canvas.height) {
+            lives--;
+            if (lives == 0) {
+                // alert("GAME OVER");
+                // resetVars();
+                document.location.reload();
+            } else {
+                resetVars();
+            }
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBall();
+        drawPaddle();
+        drawBricks();
+        drawScore();
+        drawLives();
+        
+        movePaddle();
+        bounceBall();
+        collisionDetection();
+        
+        detectWin();
+        detectLose();
+
+        x += dx;
+        y += dy;
+        
+        // causes draw function to call itself over and over again
+        requestAnimationFrame(draw);
+    }
+
+    // when keydown event is fired on any of the keys on keyboard, the
+    // keyDownHandler function will be executed, same for other
+    document.addEventListener("keydown", keyDownHandler, false);
+    document.addEventListener("keyup", keyUpHandler, false);
+    
+    var leftKeyCode = 37;
+    var rightKeyCode = 39;
+    
+    function keyDownHandler(e) {
+        if (e.keyCode == rightKeyCode) rightPressed = true;
+        else if (e.keyCode == leftKeyCode) leftPressed = true;
+    }
+
+    function keyUpHandler(e) {
+        if (e.keyCode == rightKeyCode) rightPressed = false;
+        else if (e.keyCode == leftKeyCode) leftPressed = false;
+    }
+
+    document.addEventListener("mousemove", mouseMoveHandler, false);
+    
+    function mouseMoveHandler(e) {
+        var mouseX = e.clientX - canvas.offsetLeft;
+        if(mouseX > paddleWidth/2 && mouseX < canvas.width - paddleWidth/2) {
+            paddleX = mouseX - paddleWidth/2;
+        }
+    }
+
+    //setInterval(draw, 15);  // every 10 milliseconds
+    draw(); // better rendering
+    
+</script>
+
+</body>
+</html>
